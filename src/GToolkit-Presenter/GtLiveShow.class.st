@@ -441,6 +441,25 @@ GtLiveShow >> previousStep [
 	self updateSlidePreviewsLook.
 ]
 
+{ #category : #'api - updating' }
+GtLiveShow >> reorderSlides [
+	| slideNr |
+
+	slideNr := 1.
+	previewsContainer childrenDo: [:each| |slide methodString newSlideMethod|
+		slide := self slides detect: [ :sl | sl previewElement = each].
+		slide priority = slideNr ifFalse: [
+			methodString := slide definingMethod compiledMethod sourceCode.
+			newSlideMethod := methodString
+				copyReplaceAll: ('priority: ', (slide priority) asString)
+				with: ('priority: ', (slideNr) asString).	
+			self targetLiveShow class
+				compile: newSlideMethod asString
+				classified: 'slides' ].
+		slideNr := slideNr+1].
+	self updatePreviewsContainer
+]
+
 { #category : #accessing }
 GtLiveShow >> showSlide: aSlide [
 	| slideContentElement |
@@ -723,17 +742,23 @@ GtLiveShow >> updateMethodForSlide: aSlide [
 
 { #category : #'api - updating' }
 GtLiveShow >> updatePreviewsContainer [
+	|handler|
+	handler := GtLiveSlidesSortHandler new
+		dropBlock: [self reorderSlides];
+		yourself.
 	previewsContainer removeChildren.
 	self slides
 		do: [ :each | 
 			previewsContainer
 				addChild:
-					(each asPreviewElement
+					(((each asPreviewElement
 						when: BlClickEvent
 						do: [ :e | 
 							self showSlide: each.
 							self updateSlideEditorMethod.
-							self updateSlidePreviewsLook ])].
+							self updateSlidePreviewsLook ];
+						preventChildrenMouseEvents;
+						addEventHandler: handler)))].
 ]
 
 { #category : #'api - updating' }
